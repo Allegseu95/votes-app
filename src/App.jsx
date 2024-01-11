@@ -1,3 +1,10 @@
+import { AppContext } from '@/contexts';
+import { RouterManager } from '@/routes';
+
 export const App = () => {
-  return <div>app</div>;
+  return (
+    <AppContext>
+      <RouterManager />
+    </AppContext>
+  );
 };
