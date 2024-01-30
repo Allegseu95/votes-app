@@ -10,7 +10,11 @@ import {
   Legend,
   ArcElement,
 } from 'chart.js';
+import { Tooltip as FlowbiteTooltip } from 'flowbite-react';
 import { Line, Doughnut } from 'react-chartjs-2';
+import { utils, writeFile } from 'xlsx';
+
+import { AiOutlineCloudDownload } from 'react-icons/ai';
 
 import { useAuthContext } from '@/contexts/auth';
 import { useLoader } from '@/contexts/loader';
@@ -120,6 +124,57 @@ export const DashboardPage = () => {
     hideLoader();
   };
 
+  const downloadExcel = () => {
+    const workBook = utils.book_new();
+
+    for (const item of totalsData) {
+      const data = item?.candidates?.map((ele, index) => ({
+        Candidato: ele,
+        Votos: item?.votes[index],
+      }));
+
+      data.sort((a, b) => b?.Votos - a?.Votos);
+
+      data.push({
+        Candidato: 'Votos Totales',
+        Votos: data.reduce((acc, ele) => acc + ele?.Votos, 0),
+      });
+
+      const workSheet = utils.json_to_sheet(data);
+
+      utils.book_append_sheet(workBook, workSheet, item?.dignity);
+    }
+
+    writeFile(workBook, 'Reporte.xlsx');
+  };
+
+  const downloadExcelByProvince = () => {
+    const workBook = utils.book_new();
+
+    for (const item of provincesData) {
+      const data = item?.candidates?.map((ele) => {
+        let result = {
+          Candidato: ele?.name,
+          'Votos Totales': ele?.votes?.reduce((acc, val) => acc + val, 0),
+        };
+
+        PROVINCES.forEach((pro, index) => {
+          result[pro] = ele.votes[index];
+        });
+
+        return result;
+      });
+
+      data.sort((a, b) => b?.Total - a?.Total);
+
+      const workSheet = utils.json_to_sheet(data);
+
+      utils.book_append_sheet(workBook, workSheet, item?.dignity);
+    }
+
+    writeFile(workBook, 'Reporte por Provincia.xlsx');
+  };
+
   useEffect(() => {
     getApproveRecords();
   }, []);
@@ -128,7 +183,19 @@ export const DashboardPage = () => {
     <div className='h-full px-6 py-0 xs:py-5 flex flex-col items-center gap-5 animate__animated animate__pulse'>
       <h1 className='text-4xl text-center font-bold dark:text-white'>¡Bienvenido, {user?.name}!</h1>
 
-      <h3 className='text-center font-bold uppercase dark:text-white text-2xl'>Votos Totales</h3>
+      <div className='flex flex-row gap-5 items-center'>
+        <h3 className='text-center font-bold uppercase dark:text-white text-2xl'>Votos Totales</h3>
+
+        <FlowbiteTooltip
+          placement={'right'}
+          content={'Descargar Reporte'}
+          className='dark:bg-white dark:text-black'>
+          <AiOutlineCloudDownload
+            className='dark:text-white text-5xl cursor-pointer'
+            onClick={downloadExcel}
+          />
+        </FlowbiteTooltip>
+      </div>
 
       <div className='grid grid-cols-2 gap-5 w-full'>
         {totalsData.map((item, index) => (
@@ -150,6 +217,22 @@ export const DashboardPage = () => {
             />
           </div>
         ))}
+      </div>
+
+      <div className='flex flex-row gap-5 items-center'>
+        <h3 className='text-center font-bold uppercase dark:text-white text-2xl'>
+          Votos por Provincia
+        </h3>
+
+        <FlowbiteTooltip
+          placement={'right'}
+          content={'Descargar Reporte'}
+          className='dark:bg-white dark:text-black'>
+          <AiOutlineCloudDownload
+            className='dark:text-white text-5xl cursor-pointer'
+            onClick={downloadExcelByProvince}
+          />
+        </FlowbiteTooltip>
       </div>
 
       {provincesData.map((item, index) => (
