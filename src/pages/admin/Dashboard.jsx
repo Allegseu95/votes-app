@@ -79,29 +79,31 @@ export const DashboardPage = () => {
       const total = {};
 
       for (const record of response?.data) {
-        if (!total[record.PapeletaId[0]]) {
-          total[record.PapeletaId[0]] = {
-            dignity: record?.Dignidad,
-            candidates: {},
-          };
-        }
-
-        if (!total[record.PapeletaId[0]].candidates[record.CandidatoId[0]]) {
-          total[record.PapeletaId[0]].candidates[record.CandidatoId[0]] = {
-            name: record?.Nombre + ' ' + record?.Apellido,
-            votes: PROVINCES.map((ele) => ({ province: ele, votes: 0 })),
-          };
-        }
-
-        total[record.PapeletaId[0]].candidates[record.CandidatoId[0]].votes = total[
-          record.PapeletaId[0]
-        ].candidates[record.CandidatoId[0]].votes.map((ele) => {
-          if (record?.Provincia === ele.province) {
-            ele.votes += record?.CantidadVotos;
+        if (record.Dignidad === 'Presidente') {
+          if (!total[record.PapeletaId[0]]) {
+            total[record.PapeletaId[0]] = {
+              dignity: record?.Dignidad,
+              candidates: {},
+            };
           }
 
-          return ele;
-        });
+          if (!total[record.PapeletaId[0]].candidates[record.CandidatoId[0]]) {
+            total[record.PapeletaId[0]].candidates[record.CandidatoId[0]] = {
+              name: record?.Nombre + ' ' + record?.Apellido,
+              votes: PROVINCES.map((ele) => ({ province: ele, votes: 0 })),
+            };
+          }
+
+          total[record.PapeletaId[0]].candidates[record.CandidatoId[0]].votes = total[
+            record.PapeletaId[0]
+          ].candidates[record.CandidatoId[0]].votes.map((ele) => {
+            if (record?.Provincia === ele.province) {
+              ele.votes += record?.CantidadVotos;
+            }
+
+            return ele;
+          });
+        }
       }
 
       const _provincesData = Object.values(total).map((item) => ({

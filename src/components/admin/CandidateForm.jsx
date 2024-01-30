@@ -1,15 +1,20 @@
 import React, { Fragment, useState, useEffect } from 'react';
 import { Button, Label, TextInput, Tooltip, Select } from 'flowbite-react';
+import { utils, read } from 'xlsx';
 
 import { useLoader } from '@/contexts/loader';
 
 import { candidateService } from '@/services/candidate';
 
+import { UploadExcelFile } from '../UploadExcelFile';
+
 import { errorToast, successToast } from '@/utils/toast';
 import { cleanText } from '@/utils/helpers';
 
 import { initRegisterCandidate } from '@/constants/forms';
-import { GENDERS, GENDERS_IMAGES } from '@/constants';
+import { EXCEL_FILE, GENDERS, GENDERS_IMAGES } from '@/constants';
+
+const FEMALES = ['Femenino', 'F', 'femenino', 'f'];
 
 export const CandidateForm = ({
   closeModal = () => {},
@@ -66,7 +71,6 @@ export const CandidateForm = ({
 
     data.photo = data?.gender === 'Femenino' ? GENDERS_IMAGES.female : GENDERS_IMAGES.male;
 
-    console.log('data', data);
     const response = candidate
       ? await candidateService.update(candidate.CandidatoId, data)
       : await candidateService.create(data);
@@ -102,6 +106,78 @@ export const CandidateForm = ({
     cleanFormValues();
   };
 
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+
+    if (file) {
+      if (file.type !== EXCEL_FILE) {
+        errorToast('Archivo no permitido!');
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = async (e) => {
+        showLoader();
+
+        const data = new Uint8Array(e.target.result);
+        const workbook = read(data, { type: 'array' });
+
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const excelData = utils.sheet_to_json(worksheet, { raw: true });
+
+        const insertData = [];
+
+        excelData.forEach((item) => {
+          const ballot = ballots.find(
+            (ele) => ele.Dignidad.toLowerCase() === item?.Dignidad?.toLowerCase()
+          );
+
+          if (item.Nombres && item.Apellidos && item.Organizacion && ballot) {
+            insertData.push({
+              name: item?.Nombres,
+              lastname: item?.Apellidos,
+              gender: item?.Genero ?? '',
+              birthdate: '',
+              organization: item?.Organizacion,
+              photo: FEMALES.includes(item.Genero) ? GENDERS_IMAGES.female : GENDERS_IMAGES.male,
+              ballotId: ballot?.PapeletaId,
+            });
+          }
+        });
+
+        let succesCount = 0;
+
+        for (let i = 0; i < insertData.length; i++) {
+          const response = await candidateService.create(insertData[i]);
+
+          if (!response.error) {
+            succesCount++;
+          }
+        }
+
+        await onFinish();
+
+        closeModal();
+
+        hideLoader();
+
+        successToast(
+          `${succesCount} Candidatos de ${excelData.length} fueron registrados exitosamente!`
+        );
+
+        errorToast(
+          `${excelData.length - insertData.length} Candidatos de ${
+            excelData.length
+          } no pudieron ser registrados!`
+        );
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+  };
+
   useEffect(() => {
     if (candidate !== null) {
       configDataToEdit();
@@ -112,6 +188,8 @@ export const CandidateForm = ({
 
   return (
     <Fragment>
+      <UploadExcelFile text='Registrar Candidatos por Excel' upload={handleFileUpload} />
+
       <div className='mb-4'>
         <Label
           htmlFor='name'

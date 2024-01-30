@@ -10,6 +10,7 @@ export const TableHeader = ({
   buttonClick = () => {},
   onChangeSelect = () => {},
   showButton = true,
+  buttonText = 'Nuevo',
 }) => {
   const optionsPagination = [
     { value: 5, label: '5 Registros' },
@@ -35,7 +36,7 @@ export const TableHeader = ({
           className='col-span-5 col-start-8 xs:col-span-3 xs:col-start-10 sm:col-span-5 sm:col-start-8 md:order-3 md:col-span-3 lg:col-span-2 2xl:col-span-1'
           pill
           onClick={() => buttonClick()}>
-          Nuevo
+          {buttonText}
         </Button>
       )}
 

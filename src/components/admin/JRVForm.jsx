@@ -1,15 +1,19 @@
 import React, { Fragment, useState, useEffect } from 'react';
 import { Button, Label, TextInput, Tooltip, Select, Checkbox } from 'flowbite-react';
+import { utils, read } from 'xlsx';
 
 import { useLoader } from '@/contexts/loader';
 
 import { jrvService } from '@/services/jrv';
+
+import { UploadExcelFile } from '../UploadExcelFile';
 
 import { errorToast, successToast } from '@/utils/toast';
 import { cleanText } from '@/utils/helpers';
 
 import { initRegisterJrv } from '@/constants/forms';
 import { DISTRICTS, GENDERS, PROVINCES, TYPE_PARISH, ZONES } from '@/constants';
+import { EXCEL_FILE } from '@/constants';
 
 export const JRVForm = ({
   closeModal = () => {},
@@ -102,11 +106,6 @@ export const JRVForm = ({
       isValid = false;
     }
 
-    if (_data.number_of_voters === '') {
-      changeFormValues('number_of_voters', 'invalid', true);
-      isValid = false;
-    }
-
     if (_data.userId === '') {
       changeFormValues('userId', 'invalid', true);
       isValid = false;
@@ -172,6 +171,105 @@ export const JRVForm = ({
     cleanCheckboxs();
   };
 
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+
+    if (file) {
+      if (file.type !== EXCEL_FILE) {
+        errorToast('Archivo no permitido!');
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = async (e) => {
+        showLoader();
+
+        const data = new Uint8Array(e.target.result);
+        const workbook = read(data, { type: 'array' });
+
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const excelData = utils.sheet_to_json(worksheet, { raw: true });
+
+        const insertData = [];
+
+        excelData.forEach((item) => {
+          const observer = observers.find(
+            (ele) => ele?.Email?.trim()?.toLowerCase() === item?.Observador?.trim()?.toLowerCase()
+          );
+
+          const ballotsId = item?.Papeletas?.split(',')
+            ?.map(
+              (ele) =>
+                ballots.find(
+                  (ball) => ball?.Dignidad.trim()?.toLowerCase() === ele?.trim()?.toLowerCase()
+                )?.PapeletaId
+            )
+            .filter((ele) => ele);
+
+          if (
+            item.Numero &&
+            item.Genero &&
+            item.Recinto &&
+            item.Parroquia &&
+            item.TipoParroquia &&
+            item.Canton &&
+            item.Provincia &&
+            item.Votantes &&
+            item.Observador &&
+            observer &&
+            item.Papeletas &&
+            Array.isArray(ballotsId) &&
+            ballotsId.length > 0
+          ) {
+            insertData.push({
+              number: item.Numero,
+              gender: item.Genero,
+              address: item.Direccion ?? '',
+              place: item.Recinto,
+              zone: item.Zona ?? '',
+              parish: item.Parroquia,
+              typeParish: item.TipoParroquia,
+              canton: item.Canton,
+              district: item.Circunscripcion ?? '',
+              province: item.Provincia,
+              number_of_voters: item.Votantes,
+              userId: observer.UsuarioId,
+              ballotsId: ballotsId,
+            });
+          }
+        });
+
+        let succesCount = 0;
+
+        for (let i = 0; i < insertData.length; i++) {
+          const response = await jrvService.create(insertData[i]);
+
+          if (!response.error) {
+            succesCount++;
+          }
+        }
+
+        hideLoader();
+
+        await onFinish();
+
+        closeModal();
+
+        successToast(`${succesCount} JRVs de ${excelData.length} fueron registrados exitosamente!`);
+
+        errorToast(
+          `${excelData.length - insertData.length} JRVs de ${
+            excelData.length
+          } no pudieron ser registrados!`
+        );
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+  };
+
   useEffect(() => {
     cleanCheckboxs();
 
@@ -184,6 +282,8 @@ export const JRVForm = ({
 
   return (
     <Fragment>
+      <UploadExcelFile text='Registrar JRVs por Excel' upload={handleFileUpload} />
+
       <div className='mb-4'>
         <Label
           htmlFor='number'
